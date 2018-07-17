@@ -1,5 +1,6 @@
 (ns olda.em
-  (:require [clojure.core.matrix :as m]
+  (:require [clojure.core.reducers :as r]
+            [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mops]
             [clojure.spec.alpha :as s]
             [clojure.spec.test.alpha :as stest]
@@ -29,7 +30,19 @@
   (mops/+ (m/dot xlog-tetad xlog-betad)
           eps))
 
-(defn- update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
+(def a (atom nil))
+(def wc (atom nil))
+(def xt (atom nil))
+(def xb (atom nil))
+(def p (atom nil))
+
+(defn update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
+  (if (nil? @a)
+    (do (reset! a alpha)
+        (reset! wc word-cts)
+        (reset! xt xlog-tetad)
+        (reset! xb xlog-betad)
+        (reset! p phinorm)))
   ;; (let [word-cts (:word-cts doc)
   ;;       alpha (:alpha params)])
   (mops/+ alpha
@@ -41,7 +54,7 @@
   
   [params doc xlog-tetad xlog-betad phinorm]
   (let [gammad (update-gammad (-> params :model :alpha)
-                              (:word-cts doc)
+                              (:word-counts doc)
                               xlog-tetad xlog-betad phinorm)
         xlog-tetad (dirichlet/xlogexp gammad)
         phinorm (norm-phi (-> params :ctrl :epsilon) xlog-tetad xlog-betad)]
@@ -73,7 +86,7 @@
      
      (if (or (mean-changed? prev-gammad curr-gammad (-> params :ctrl :mean-thresh))               
              (zero? n))
-       [curr-gammad (m/outer-product xlog-tetad (mops// (:word-cts doc) phinorm))]
+       (do (prn "DBUG: " n) [curr-gammad (m/outer-product xlog-tetad (mops// (:word-counts doc) phinorm))])
        (recur (dec n)
               curr-gammad
               (gammad-teta-phi params doc xlog-tetad xlog-betad phinorm)))))
@@ -85,7 +98,7 @@
                        (make-betad (-> docs first :word-ids) xlog-beta))))
 
 
-(defn- update-teta [ids columns teta]
+(defn- update-teta-old [ids columns teta]
   (let [res
         (reduce #(let [idx (nth ids %2)
                        new-col (mops/+ (m/get-column %1 idx)
@@ -93,6 +106,33 @@
                    (m/set-column %1 idx new-col))
                 teta (-> ids count range))]
     res))
+
+
+(defn- reducer-fn [ids columns shape]
+  (fn
+    ([] (apply m/new-matrix shape))
+    ([zero-m id] (m/set-column zero-m
+                               (nth ids id)
+                               (m/get-column columns id)))))
+
+(defn- combiner-fn [shape]
+  (fn
+    ([] (apply m/new-matrix shape))
+    ([m1 m2] (mops/+ m1 m2))))
+
+(def i (atom nil))
+(def c (atom nil))
+(def t (atom nil))
+
+(defn update-teta [ids columns teta]
+  (if (nil? @i)
+    (do (reset! i ids) (reset! c columns) (reset! t teta)))
+  (let [shape (m/shape teta)
+        reduce-f (reducer-fn ids columns shape)
+        combine-f (combiner-fn shape)
+        sparse-m (r/fold combine-f reduce-f (-> ids count range))]
+    (mops/+ teta sparse-m)))
+
 
 (defn sample-gamma' [params docs]
   (repeatedly (count docs)
@@ -148,8 +188,8 @@
        (recur (inc idx) (first docs) (rest docs)
               (m/set-row gamma idx (first stats))
               xlog-beta
-              (update-teta (:word-ids doc) (second stats) teta)
-              (converge-gamma-phi (inc idx) params docs gamma xlog-beta))))))
+              (do (prn "DBUG-start-update: " (inc idx)) (update-teta (:word-ids doc) (second stats) teta))
+              (do (prn "DBUG-start-converge: " (inc idx)) (converge-gamma-phi (inc idx) params docs gamma xlog-beta)))))))
 
 
 (defn do-m
@@ -174,10 +214,14 @@
          params (assoc params :model model-params)
          
          ;; do e-step
+         _ (prn "DBUG: starting E-step")
          [gamma stats :as gs] (do-e params docs lambda)
          
          ;; do m-step
-         lambda (do-m (:model params) (count docs) lambda gs)] 
+         _ (prn "DBUG: starting M-step")         
+         lambda (do-m (:model params) (count docs) lambda gs)
+
+         _ (prn "DBUG: all done!")] 
      
      ;; return updated latent vars
      {:params (update-in params [:ctrl :counter] inc)

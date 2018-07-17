@@ -5,11 +5,11 @@
 (defn expectation
   "For an array theta ~ Dir(alpha) computes E[log(theta)] given alpha"
   [array]
-  (let [psi-alpha (olda-math/psi alpha)
-        psi-sum (olda-math/psi-of-sum alpha)]
-    (if (vec? alpha)
-      (sub psi-alpha psi-sum)
-      (vec (map-indexed #(emap - %2 (nth psi-sum %1)) psi-alpha)))))
+  (let [psi-a (olda-math/psi array)
+        psi-sum (olda-math/psi-of-sum array)]
+    (if (vec? array)
+      (sub psi-a psi-sum)
+      (vec (map-indexed #(emap - %2 (nth psi-sum %1)) psi-a)))))
 
 
 (defn xlogexp

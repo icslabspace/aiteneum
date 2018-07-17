@@ -113,3 +113,19 @@
   (reduce #(+ %1 (reduce + 0 (:word-counts %2))) 0 i-bows))
 
 
+;; ----------------------------------------------
+;; TESTING purposes -> remove words that appear less
+;; than n times in a document (by default n=1)
+(defn- update-ibow [ibow n]
+  (reduce #(-> %1
+               (update :word-ids conj (first %2))
+               (update :word-counts conj (second %2)))
+          {:word-ids [] :word-counts []}
+          (filter #(< n (val %))
+                  (zipmap (-> ibow :word-ids)
+                          (-> ibow :word-counts)))))
+
+(defn clean-ibows [ibows n]
+  (doall (map #(update-ibow % n) ibows)))
+
+;; -----------------------------------------------

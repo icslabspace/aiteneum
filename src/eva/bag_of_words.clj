@@ -9,29 +9,26 @@
     (assoc! t-bow (keyword word) (inc idx))))
 
 (defn- bow-to-lists [bow]
-  {:ids (->> bow
-             keys
-             (into [])
-             (r/map name)
-             (r/map read-string)
-             (r/fold conj))
-   :counts (->> bow
-                vals
-                (into []))})
-
-(defn- merge-stats [x y]
-  (-> x
-      (update :idss conj! (:ids y))
-      (update :countss conj! (:counts y))))
+  {:word-ids (->> bow
+                  keys
+                  (into [])
+                  (r/map name)
+                  (r/map read-string)
+                  (into []))
+   :word-counts (->> bow
+                     vals
+                     (into []))})
 
 (defn file->doc
   "Read the content of a text file and outputs
   a vector of strings"
   [file]
-  (let [tok-fn #(s/split % #"\s+")
+  (let [alpha-fn #(s/replace % #"[^\s\w]" "")
+        tok-fn #(s/split % #"\s+")
         words-fn (fn [x] (filter #(not (= "" %)) x))]
     (-> file
         slurp
+        alpha-fn
         tok-fn
         words-fn)))
 
@@ -50,14 +47,14 @@
 (defn doc->indexed-bow
   "Convert a collection of strings into an indexed bag
   of words as map of lists:
-  {:ids `(10 20 30 .. )
-   :counts `(1 2 3 ..)}
+  {:word-ids [10 20 30 .. ]
+   :word-counts [1 2 3 ..]}
 
-  The list at key :ids says what vocabulary tokens are present
-  the input collection.
+  The collection at key :word-ids says what vocabulary
+  tokens are present the input collection.
 
-  The list at key :counts says how many times the token appears
-  int the input collection."
+  The collection at key :word-counts says how many times
+  the token appears int the input collection."
   
   [doc]
   (loop [bow (transient {})
@@ -74,27 +71,19 @@
 
 (defn docs->indexed-bows
   "Convert a collection of collection of strings into an
-  indexed bag of words as a map of lists of lists:
-  {:idss `((10 20 30) (30 40 10) .. )
-   :countss `((1 2 3) (3 4 1) ..)}
+  indexed bag of words as list of maps <word-ids,word-counts>:
+  [{:word-ids [10 20 30] :word-counts [1 2 3]} ...] 
 
-  The list at key :idss says what vocabulary tokens are
-  present in each document. idss[i][j] gives the jth
-  unique token present in document i. 
-  
-  The list at key :countss says how many times each vocabulary
-  token is present. counts[i][j] is the number of times
-  that the token given by wordids[i][j] appears in document i."
+  Map i from result, gives information about word ids and
+  word counts from doc i from input"
   
   [docs]
-  (loop [result {:idss (transient [])
-                 :countss (transient [])}
+  (loop [result (transient [])
          doc (first docs)
          d docs]
     (if (nil? doc)
-      {:idss (persistent! (:idss result))
-       :countss (persistent! (:countss result))}
-      (recur (merge-stats result (doc->indexed-bow doc))
+      (persistent! result)
+      (recur (conj! result (doc->indexed-bow doc))
              (second d)
              (rest d)))))
 

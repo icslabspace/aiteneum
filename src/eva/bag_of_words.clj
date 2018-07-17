@@ -102,9 +102,11 @@
   (let [files (-> folder
                   io/file
                   .listFiles)]
-    (->> files
-         (pmap file->doc)
-         (docs->indexed-bows))))
+    (if-not (nil? files)
+      (->> files
+           (pmap file->doc)
+           (docs->indexed-bows))
+      (throw (java.io.FileNotFoundException. (str folder " not found!"))))))
 
 ;; includes duplicates
 (defn get-bags-size [i-bows]

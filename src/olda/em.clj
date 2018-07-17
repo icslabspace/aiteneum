@@ -25,11 +25,11 @@
             :lambda nil
             :gamma nil})
 
-(defn norm-phi [eps xlog-tetad xlog-betad]
+(defn- norm-phi [eps xlog-tetad xlog-betad]
   (mops/+ (m/dot xlog-tetad xlog-betad)
           eps))
 
-(defn update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
+(defn- update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
   ;; (let [word-cts (:word-cts doc)
   ;;       alpha (:alpha params)])
   (mops/+ alpha
@@ -48,18 +48,18 @@
     
     [gammad xlog-tetad phinorm]))
 
-(defn mean-changed? [prev-gammad curr-gammad mean-thresh]
+(defn- mean-changed? [prev-gammad curr-gammad mean-thresh]
   (-> (mops/- curr-gammad prev-gammad)
       m/abs
       fast-math/mean
       (< mean-thresh)))
 
-(defn make-betad [word-ids xlog-beta]
+(defn- make-betad [word-ids xlog-beta]
   (m/transpose (into []
                      (map #(m/get-column xlog-beta %))
                      word-ids)))
 
-(defn converge-gamma-phi
+(defn- converge-gamma-phi
   ([params doc gammad xlog-betad]
    ;; elogd ->  {:xlog-theatad exp-elog-tetad :xlog-betad exp-elog-betad}
    
@@ -85,7 +85,7 @@
                        (make-betad (-> docs first :word-ids) xlog-beta))))
 
 
-(defn update-teta [ids columns teta]
+(defn- update-teta [ids columns teta]
   (let [res
         (reduce #(let [idx (nth ids %2)
                        new-col (mops/+ (m/get-column %1 idx)
@@ -108,39 +108,15 @@
                        :shape (-> params :gamma :shape)
                        :scale (-> params :gamma :scale))))
 
-(defn init-teta [params]
+(defn- init-teta [params]
   (m/new-matrix (-> params :num-topics)
                 (-> params :dict :num-words)))
 
-(defn compute-rho [tau kappa counter]
+(defn- compute-rho [tau kappa counter]
   (fast-core/pow (+ tau counter)
                  (- kappa)))
-
-#_(defn ^:deprecated do-e-old
-  [params docs lambda]
-  (loop [idx 0 ;;batch-size (count docs)
-         docs docs
-         num-topics (-> params :ctrl :num-topics)
-         gamma (->  params :model (sample-gamma' docs)) 
-         xlog-beta (dirichlet/xlogexp lambda) ; (-> params :lambda :xlog-beta)
-         teta (-> params :model init-teta)
-         stats (converge-gamma-phi idx params docs gamma xlog-beta)]
-    (if (-> docs seq not)
-      [gamma (mops/* teta xlog-beta)]
-      (recur (inc idx)
-             (rest docs)
-             num-topics
-             (m/set-row gamma idx (first stats))
-             xlog-beta
-             (update-teta (-> docs first :word-ids) (second stats) teta)
-             (when (-> docs rest seq)
-               (converge-gamma-phi (inc idx)
-                                   params
-                                   (-> docs rest)
-                                   (m/get-row gamma (inc idx))
-                                   xlog-beta))))))
-
 (defn do-e
+  "The e step of the Online LDA algorithm"
   ([params docs gamma lambda]
    (let [;gamma (-> params :model (sample-gamma' docs))
          teta (-> params :model init-teta)
@@ -176,7 +152,9 @@
               (converge-gamma-phi (inc idx) params docs gamma xlog-beta))))))
 
 
-(defn do-m [params docs-count lambda [gamma stats]]
+(defn do-m
+  "The m step of the Online LDA algorithm"
+  [params docs-count lambda [gamma stats]]
   (let [lro (mops/* (->> params :rho (- 1)) lambda)
         nstats (mops/* (:estimated-num-docs params)
                        (mops// stats docs-count))]
@@ -184,6 +162,7 @@
                         (mops/+ (:eta params) nstats)))))
 
 (defn do-em
+  "The Online LDA training algorithm"
   ([params docs lambda]
    (let [;; init some model params
          model-params (assoc (:model params)
@@ -226,7 +205,10 @@
       :gamma gamma
       :lambda lambda})))
 
-(defn do-ems [params docs lambda n]
+(defn do-ems
+  "This is what usually is called to train an
+  Online LDA model for a number of n iterations"
+  [params docs lambda n]
   (loop [iters n
          model {:params params
                 :gamma nil

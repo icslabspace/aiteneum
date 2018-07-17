@@ -1,0 +1,15 @@
+(ns olda.dirichlet
+  (:require [olda.math :refer [psi psi-of-sum]]
+            [clojure.core.matrix :refer [esum emap sub transpose vec?]]))
+
+(defn expectation
+  "
+  For a vector theta ~ Dir(alpha), computes E[log(theta)] given alpha.
+  "
+  [alpha]
+  (let [psi-alpha (psi alpha)
+        psi-sum (psi-of-sum alpha)]
+    (if (vec? alpha)
+      (sub psi-alpha psi-sum)
+      (vec (map-indexed #(emap - %2 (nth psi-sum %1)) psi-alpha)))))
+

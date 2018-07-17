@@ -108,6 +108,6 @@
 
 ;; includes duplicates
 (defn get-bags-size [i-bows]
-  (reduce #(+ %1 (reduce + 0 %2)) 0 (:counts i-bows)))
+  (reduce #(+ %1 (reduce + 0 (:word-counts %2))) 0 i-bows))
 
 

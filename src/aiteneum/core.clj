@@ -8,7 +8,7 @@
 
 (def params {:ctrl {:counter 0
                     :m-iters 1
-                    :num-iters 1
+                    :num-iters 200
                     :epsilon 1e-3
                     :mean-thresh 1e-5}
              :model {:alpha 0.5

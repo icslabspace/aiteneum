@@ -30,25 +30,19 @@
   (mops/+ (m/dot xlog-tetad xlog-betad)
           eps))
 
-(def a (atom nil))
-(def wc (atom nil))
-(def xt (atom nil))
-(def xb (atom nil))
-(def p (atom nil))
-
-(defn update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
-  (if (nil? @a)
-    (do (reset! a alpha)
-        (reset! wc word-cts)
-        (reset! xt xlog-tetad)
-        (reset! xb xlog-betad)
-        (reset! p phinorm)))
-  ;; (let [word-cts (:word-cts doc)
-  ;;       alpha (:alpha params)])
+(defn update-gammad-old [alpha word-cts xlog-tetad xlog-betad phinorm]
   (mops/+ alpha
           (mops/* xlog-tetad
                   (m/dot (mops// word-cts phinorm)
                          (m/transpose xlog-betad)))))
+
+;; TODO: transients
+(defn update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
+  (mops/+ alpha
+          (mops/* xlog-tetad
+                  (vec (pmap #(m/dot (mops// word-cts phinorm) %)
+                             xlog-betad)))))
+
 
 (defn ^:make-private gammad-teta-phi
   
@@ -69,24 +63,24 @@
 
 (defn- make-betad [word-ids xlog-beta]
   (m/transpose (into []
-                     (map #(m/get-column xlog-beta %))
-                     word-ids)))
+                     (doall (pmap #(m/get-column xlog-beta %)
+                                  word-ids)))))
 
-(defn- converge-gamma-phi
+;; TODO: rather go for a trasient approach
+(defn converge-gamma-phi
   ([params doc gammad xlog-betad]
    ;; elogd ->  {:xlog-theatad exp-elog-tetad :xlog-betad exp-elog-betad}
-   
    (loop [n (-> params :ctrl :num-iters)
           prev-gammad gammad
           [curr-gammad xlog-tetad phinorm] (gammad-teta-phi params doc (dirichlet/xlogexp gammad)
-                                                            xlog-betad
-                                                            (norm-phi (-> params :ctrl :epsilon)
-                                                                      (dirichlet/xlogexp gammad)
-                                                                      xlog-betad))]
+                                                                   xlog-betad
+                                                                   (norm-phi (-> params :ctrl :epsilon)
+                                                                                    (dirichlet/xlogexp gammad)
+                                                                                    xlog-betad))]
      
      (if (or (mean-changed? prev-gammad curr-gammad (-> params :ctrl :mean-thresh))               
              (zero? n))
-       (do (prn "DBUG: " n) [curr-gammad (m/outer-product xlog-tetad (mops// (:word-counts doc) phinorm))])
+       [curr-gammad (m/outer-product xlog-tetad (mops// (:word-counts doc) phinorm))]
        (recur (dec n)
               curr-gammad
               (gammad-teta-phi params doc xlog-tetad xlog-betad phinorm)))))
@@ -98,40 +92,47 @@
                        (make-betad (-> docs first :word-ids) xlog-beta))))
 
 
-(defn- update-teta-old [ids columns teta]
-  (let [res
-        (reduce #(let [idx (nth ids %2)
-                       new-col (mops/+ (m/get-column %1 idx)
-                                       (m/get-column columns %2))]
-                   (m/set-column %1 idx new-col))
-                teta (-> ids count range))]
-    res))
+;; TODO: to be removed
+;; (defn- update-teta [ids columns teta]
+;;   (let [res
+;;         (reduce #(let [idx (nth ids %2)
+;;                        new-col (mops/+ (m/get-column %1 idx)
+;;                                        (m/get-column columns %2))]
+;;                    (m/set-column %1 idx new-col))
+;;                 teta (-> ids count range))]
+;;     res))
 
 
-(defn- reducer-fn [ids columns shape]
-  (fn
-    ([] (apply m/new-matrix shape))
-    ([zero-m id] (m/set-column zero-m
-                               (nth ids id)
-                               (m/get-column columns id)))))
+;; (defn- reducer-fn [ids columns shape]
+;;   (fn
+;;     ([] (apply m/new-matrix shape))
+;;     ([zero-m id] (m/set-column zero-m
+;;                                (nth ids id)
+;;                                (m/get-column columns id)))))
 
-(defn- combiner-fn [shape]
-  (fn
-    ([] (apply m/new-matrix shape))
-    ([m1 m2] (mops/+ m1 m2))))
+;; (defn- combiner-fn [shape]
+;;   (fn
+;;     ([] (apply m/new-matrix shape))
+;;     ([m & ms] (apply mops/+ m ms))))
 
-(def i (atom nil))
-(def c (atom nil))
-(def t (atom nil))
 
-(defn update-teta [ids columns teta]
-  (if (nil? @i)
-    (do (reset! i ids) (reset! c columns) (reset! t teta)))
-  (let [shape (m/shape teta)
-        reduce-f (reducer-fn ids columns shape)
-        combine-f (combiner-fn shape)
-        sparse-m (r/fold combine-f reduce-f (-> ids count range))]
-    (mops/+ teta sparse-m)))
+;; (defn update-teta [ids columns teta]
+;;   (let [shape (time (m/shape teta))
+;;         reduce-f (time (reducer-fn ids columns shape))
+;;         combine-f (time (combiner-fn shape))
+;;         sparse-m (time (r/fold 50 combine-f reduce-f (-> ids count range)))]
+;;     (time (mops/+ teta sparse-m))))
+
+
+(defn- update-teta [ids columns teta]
+  (let [nu-teta (transient (apply m/new-matrix (-> teta m/shape reverse)))
+        columns (m/transpose columns)
+        res
+        (doall (map #(let [idx (nth ids %)]
+                        (assoc! nu-teta idx (nth columns %)))
+                     (-> ids count range)))]
+    (mops/+ teta
+            (m/transpose (persistent! nu-teta)))))
 
 
 (defn sample-gamma' [params docs]
@@ -155,6 +156,8 @@
 (defn- compute-rho [tau kappa counter]
   (fast-core/pow (+ tau counter)
                  (- kappa)))
+
+
 (defn do-e
   "The e step of the Online LDA algorithm"
   ([params docs gamma lambda]
@@ -188,8 +191,8 @@
        (recur (inc idx) (first docs) (rest docs)
               (m/set-row gamma idx (first stats))
               xlog-beta
-              (do (prn "DBUG-start-update: " (inc idx)) (update-teta (:word-ids doc) (second stats) teta))
-              (do (prn "DBUG-start-converge: " (inc idx)) (converge-gamma-phi (inc idx) params docs gamma xlog-beta)))))))
+              (update-teta (:word-ids doc) (second stats) teta)
+              (converge-gamma-phi (inc idx) params docs gamma xlog-beta))))))
 
 
 (defn do-m
@@ -221,7 +224,8 @@
          _ (prn "DBUG: starting M-step")         
          lambda (do-m (:model params) (count docs) lambda gs)
 
-         _ (prn "DBUG: all done!")] 
+         _ (prn "DBUG: all done!")
+         ] 
      
      ;; return updated latent vars
      {:params (update-in params [:ctrl :counter] inc)

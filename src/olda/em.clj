@@ -8,7 +8,12 @@
             [fastmath.stats :as fast-math]
             [fastmath.core :as fast-core]
             [olda.math :as olda-math]
-            [olda.dirichlet :as dirichlet]))
+            [olda.dirichlet :as dirichlet]
+            [denisovan.core]
+            ))
+
+(clojure.core.matrix/set-current-implementation :neanderthal)
+;;(clojure.core.matrix/set-current-implementation :vectorz)
 
 (def model {:params {:ctrl {:counter 0
                             :num-iters 400
@@ -27,29 +32,32 @@
             :gamma nil})
 
 (defn- norm-phi [eps xlog-tetad xlog-betad]
-  (mops/+ (m/dot xlog-tetad xlog-betad)
-          eps))
+  (mops/+
+   (m/mmul xlog-tetad xlog-betad)
+   eps))
 
 (defn update-gammad-old [alpha word-cts xlog-tetad xlog-betad phinorm]
   (mops/+ alpha
           (mops/* xlog-tetad
-                  (m/dot (mops// word-cts phinorm)
+                  (m/mmul (mops// word-cts phinorm)
                          (m/transpose xlog-betad)))))
 
 ;; TODO: transients
 (defn update-gammad [alpha word-cts xlog-tetad xlog-betad phinorm]
   (mops/+ alpha
           (mops/* xlog-tetad
-                  (vec (pmap #(m/dot (mops// word-cts phinorm) %)
-                             xlog-betad)))))
+                  (m/transpose (m/mmul xlog-betad
+                                       (m/transpose (mops// word-cts phinorm))
+                                        ;(m/transpose xlog-betad)
+                                       )))))
 
 
 (defn ^:make-private gammad-teta-phi
   
   [params doc xlog-tetad xlog-betad phinorm]
   (let [gammad (update-gammad (-> params :model :alpha)
-                              (:word-counts doc)
-                              xlog-tetad xlog-betad phinorm)
+                                     (-> doc :word-counts m/array)
+                                     xlog-tetad xlog-betad phinorm)
         xlog-tetad (dirichlet/xlogexp gammad)
         phinorm (norm-phi (-> params :ctrl :epsilon) xlog-tetad xlog-betad)]
     
@@ -61,26 +69,25 @@
       fast-math/mean
       (< mean-thresh)))
 
-(defn- make-betad [word-ids xlog-beta]
-  (m/transpose (into []
-                     (doall (pmap #(m/get-column xlog-beta %)
-                                  word-ids)))))
+
+(defn make-betad [word-ids xlog-beta]
+  (m/array (m/select xlog-beta :all  word-ids)))
 
 ;; TODO: rather go for a trasient approach
 (defn converge-gamma-phi
   ([params doc gammad xlog-betad]
    ;; elogd ->  {:xlog-theatad exp-elog-tetad :xlog-betad exp-elog-betad}
+   ;(prn (-> params :ctrl :num-iters))
    (loop [n (-> params :ctrl :num-iters)
           prev-gammad gammad
           [curr-gammad xlog-tetad phinorm] (gammad-teta-phi params doc (dirichlet/xlogexp gammad)
                                                                    xlog-betad
                                                                    (norm-phi (-> params :ctrl :epsilon)
-                                                                                    (dirichlet/xlogexp gammad)
-                                                                                    xlog-betad))]
-     
+                                                                             (dirichlet/xlogexp gammad)
+                                                                             xlog-betad))]
      (if (or (mean-changed? prev-gammad curr-gammad (-> params :ctrl :mean-thresh))               
              (zero? n))
-       [curr-gammad (m/outer-product xlog-tetad (mops// (:word-counts doc) phinorm))]
+       [curr-gammad (m/outer-product xlog-tetad (mops// (m/array (:word-counts doc)) phinorm))]
        (recur (dec n)
               curr-gammad
               (gammad-teta-phi params doc xlog-tetad xlog-betad phinorm)))))
@@ -88,19 +95,39 @@
   ([idx params docs gamma xlog-beta]
    (converge-gamma-phi params
                        (first docs)
-                       (m/get-row gamma idx)
+                       (m/array (m/get-row gamma idx))
+                                        ;(m/select gamma idx :all)
                        (make-betad (-> docs first :word-ids) xlog-beta))))
 
 
 ;; TODO: to be removed
-;; (defn- update-teta [ids columns teta]
-;;   (let [res
-;;         (reduce #(let [idx (nth ids %2)
-;;                        new-col (mops/+ (m/get-column %1 idx)
-;;                                        (m/get-column columns %2))]
-;;                    (m/set-column %1 idx new-col))
-;;                 teta (-> ids count range))]
-;;     res))
+;; (defn- update-teta-old [ids columns teta]
+;;   ;(let [res])
+;;   (reduce #(let [idx (nth ids %2)
+;;                     new-col (mops/+ (m/get-column %1 idx)
+;;                                     (m/get-column columns %2))]
+;;                 (m/set-column %1 idx new-col))
+;;              teta (-> ids count range m/array))
+;;   ;res
+;;   )
+
+(def i (atom nil))
+(def c (atom nil))
+(def t (atom nil))
+
+(defn- update-teta [ids columns teta]
+  ;(let [res])
+  (map #(let [idx (nth ids %1)
+              new-col (mops/+ (m/get-column teta idx)
+                              (m/get-column columns %1)
+                       ;(m/select teta :all idx)
+                       ;(m/select columns :all %1)
+                       )]
+          (m/set-column! teta idx new-col))
+       (-> ids count range))
+                                        ;res
+  teta
+  )
 
 
 ;; (defn- reducer-fn [ids columns shape]
@@ -124,7 +151,7 @@
 ;;     (time (mops/+ teta sparse-m))))
 
 
-(defn- update-teta [ids columns teta]
+(defn- update-teta-1 [ids columns teta]
   (let [nu-teta (transient (apply m/new-matrix (-> teta m/shape reverse)))
         columns (m/transpose columns)
         res
@@ -136,18 +163,18 @@
 
 
 (defn sample-gamma' [params docs]
-  (repeatedly (count docs)
-              (partial sample-gamma
-                       (-> params :num-topics)
-                       :shape (-> params :gamma :shape)
-                       :scale (-> params :gamma :scale))))
+  (m/matrix (repeatedly (count docs)
+                        (partial sample-gamma
+                                 (-> params :num-topics)
+                                 :shape (-> params :gamma :shape)
+                                 :scale (-> params :gamma :scale)))))
 
 (defn sample-lambda' [params]
-  (repeatedly (-> params :num-topics)
-              (partial sample-gamma
-                       (-> params :dict :num-words)
-                       :shape (-> params :gamma :shape)
-                       :scale (-> params :gamma :scale))))
+  (m/matrix (repeatedly (-> params :num-topics)
+                        (partial sample-gamma
+                                 (-> params :dict :num-words)
+                                 :shape (-> params :gamma :shape)
+                                 :scale (-> params :gamma :scale)))))
 
 (defn- init-teta [params]
   (m/new-matrix (-> params :num-topics)
@@ -170,8 +197,9 @@
 
   ([params docs lambda]
    (let [gamma (-> params :model (sample-gamma' docs))
-         teta (-> params :model init-teta)
+         teta  (-> params :model init-teta)
          xlog-beta (dirichlet/xlogexp lambda)
+         
          stats (converge-gamma-phi 0 params docs gamma xlog-beta)]
      
      (do-e params docs gamma teta xlog-beta stats)))
@@ -180,25 +208,30 @@
    (loop [idx 0 ;;batch-size (count docs)
           doc (first docs)
           docs (rest docs)
-          gamma gamma
-          xlog-beta xlog-beta
-          teta teta
           stats stats]
      (if (-> docs seq not)
        [;gamma (mops/* teta xlog-beta)
-        (m/set-row gamma idx (first stats))
-        (mops/* (update-teta (:word-ids doc) (second stats) teta) xlog-beta)]
+        (m/set-row! gamma idx (first stats))
+        (mops/* ;; (do
+                ;;   (update-teta (:word-ids doc) (second stats) teta) teta)
+                (update-teta (:word-ids doc) (second stats) teta)
+                xlog-beta)]
        (recur (inc idx) (first docs) (rest docs)
-              (m/set-row gamma idx (first stats))
-              xlog-beta
-              (update-teta (:word-ids doc) (second stats) teta)
-              (converge-gamma-phi (inc idx) params docs gamma xlog-beta))))))
+              (do (m/set-row! gamma idx (first stats))
+                  (update-teta (:word-ids doc) (second stats) teta)
+                  (converge-gamma-phi (inc idx) params docs gamma xlog-beta)))))))
 
+
+;; (defn converge-gamma-phi [params words-cts gammad xlog-teta xlog-beta phinorm]
+;;   )
+;; (defn do-e
+;;   ([params docs gamma teta xlog-beta stats]
+;;    ))
 
 (defn do-m
   "The m step of the Online LDA algorithm"
-  [params docs-count lambda [gamma stats]]
-  (let [lro (mops/* (->> params :rho (- 1)) lambda)
+  [params docs-count lambda gamma stats]
+  (let [lro (mops/* (->> params :rho (- 1.0)) lambda)
         nstats (mops/* (:estimated-num-docs params)
                        (mops// stats docs-count))]
     (mops/+ lro (mops/* (:rho params)
@@ -217,19 +250,20 @@
          params (assoc params :model model-params)
          
          ;; do e-step
-         _ (prn "DBUG: starting E-step")
-         [gamma stats :as gs] (do-e params docs lambda)
+         ;_ (prn "DBUG: starting E-step")
+         [gamma stats :as gs] (time (do-e params docs lambda))
          
          ;; do m-step
-         _ (prn "DBUG: starting M-step")         
-         lambda (do-m (:model params) (count docs) lambda gs)
+         ;_ (prn "DBUG: starting M-step")         
+         lambda (time (do-m (:model params) (count docs) lambda gamma stats))
 
-         _ (prn "DBUG: all done!")
+         ;_ (prn "DBUG: all done!")
          ] 
      
      ;; return updated latent vars
      {:params (update-in params [:ctrl :counter] inc)
       :gamma gamma
+      :stats stats
       :lambda lambda}))
   
   ([params docs gamma lambda]
@@ -264,7 +298,7 @@
     (if (zero? iters)
       model
       (recur (dec iters)
-             (do-em (:params model) docs (:lambda model))))))
+             (time (do-em (:params model) docs (:lambda model)))))))
 
 (defn grow-model [model doc-cts num-words num-topics] ;; doc-cts, word-cts and num-topics need to be larger than model's
   (let [model (assoc-in model

@@ -6,21 +6,24 @@
 
 (def i-bow (eva.bag-of-words/docs->indexed-bows docs))
 
-(def params {:ctrl {:counter 0
-                    :m-iters 1
-                    :num-iters 200
-                    :epsilon 1e-3
-                    :mean-thresh 1e-5}
-             :model {:alpha 0.5
-                     :eta 2
-                     :tau 3
-                     :kappa 4
+(def params {:ctrl {:counter 0.0
+                    :m-iters 100
+                    :num-iters 100
+                    :epsilon 1e-100
+                    :mean-thresh 1e-35}
+             :model {:alpha (/ 1.0 8.0)
+                     :eta (/ 1.0 8.0)
+                     :tau 1.0
+                     :kappa 0.5
                      :num-topics 8
-                     :estimated-num-docs nil
-                     :dict {:num-words nil}
+                     :estimated-num-docs 8
+                     :dict {:num-words 8228}
                      :gamma {:shape 100
                              :scale 1e-2}}})
 
 ;(def olda-model (olda/train params i-bow))
 
 ;(def i-bow (eva.bag-of-words/files->indexed-bows "../cambioscience-all/selena/resources/data/single-doc/"))
+
+;(def i-bow (eva.bag-of-words/files->indexed-bows "resources/"))
+

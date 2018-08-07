@@ -3,9 +3,13 @@
             [clojure.walk :refer [postwalk]]
             [clojure.core.matrix :refer [esum emap add sub transpose vec? array?] :as m]
             [clojure.spec.alpha :as s]
-            [clojure.spec.test.alpha :as stest]))
+            [clojure.spec.test.alpha :as stest]
+            [uncomplicate.neanderthal.core :as uncle]
+            [uncomplicate.neanderthal.native :as untive]
+            [uncomplicate.fluokitten.core :as fluc]
+            [uncomplicate.fluokitten.jvm :as fluj]))
 
-(defn psi
+(defn ^:deprecated psi-d
   "Compute the psi function for a matrix input"
   [matrix]
   (postwalk #(if (number? %)
@@ -13,7 +17,10 @@
                %)
             matrix))
 
-(defn psi-of-sum
+(defn ^:core-matrix psi-cm [matrix]
+  (emap #(digamma %) matrix))
+
+(defn ^:deprecated psi-of-sum-1
   "Add columns of a matrix and then compute
   the psi function on that vector"
   [matrix]
@@ -21,14 +28,119 @@
        ;; transpose and add is equivalent to: (into [] (map #(apply + %)) alpha)
        transpose
        (apply add)
-       psi))
+       m/array
+       psi-cm))
 
-(defn expn
+(defn psi-of-sum-m-cm
+  [matrix]
+  (->> matrix
+       m/rows
+       (map m/esum)
+       m/array
+       psi-cm))
+
+(defn psi-of-sum-v-cm
+  [v]
+  (m/esum v))
+
+(defn psi-of-sum-cm
+  [a]
+  (cond (m/vec? a) (psi-of-sum-v-cm a)
+        (m/matrix? a) (psi-of-sum-m-cm a)))
+
+(defn expn-cm
   "Compute e^(ai) where ai are inputs of a 2D matrix;
   it returns a 2D matrix"
   [array]
   (emap #(exp %) array))
 
+(defn- ^:ndeanderthal di-gamma ^double [^double x]
+  (digamma x))
+
+(defn- ^:neanderthal P+ ^double [^double x ^double y]
+  (+ x y))
+
+(defn ^:neanderthal psi [m]
+  (fluc/fmap di-gamma m))
+
+(defn ^:neanderthal psi-of-sum [m]
+  (fluc/fmap fluc/fold (uncle/rows m)))
+
+(defn ^:neanderthal expectation [a]
+  ;; (cond
+  ;;   (uncle/vctr? a) (uncle/sum a)
+  ;;   (uncle/matrix? a) (->> a uncle/rows (map uncle/sum)
+  ;;                          untive/dv
+  ;;                          psi))
+  (map (fn [r] (let [psi-sum (-> r uncle/sum digamma)]
+                 (map #(-> %
+                           digamma
+                           (- psi-sum))
+                      r)))
+       (uncle/rows a)))
+
+(defn- ^:neanderthal exponential ^double [^double x]
+  (exp x))
+
+(defn ^:neanderthal expn [a]
+  (fluc/fmap exponential a))
+
+;; new stuff
+(defn mf [f mx]
+  (fluc/fmap (fn ^double [^double x] (f x)) mx))
+
+(defn mf! [f mx]
+  (fluc/fmap! (fn ^double [^double x] (f x)) mx))
+
+(defn mop [f val mx]
+  (fluc/fmap (fn ^double [^double x] (f x val)) mx))
+
+(defn mop! [f val mx]
+  (fluc/fmap! (fn ^double [^double x] (f x val)) mx))
+
+(defn m+ [val m]
+  (mop + val m))
+
+(defn m* [val m]
+  (mop * val m))
+
+(defn mdiv [val m]
+  (mop / val m))
+
+(defn m+! [val m]
+  (mop! + val m))
+
+(defn m*! [val m]
+  (mop! * val m))
+
+(defn mdiv! [val m]
+  (mop! / val m))
+
+(defn mmop [f mx my]
+  (fluc/fmap (fn ^double [^double x ^double y] (f x y)) mx my))
+
+(defn mmop! [f mx my]
+  (fluc/fmap! (fn ^double [^double x ^double y] (f x y)) mx my))
+
+(defn mm+ [mx my]
+  (mmop + mx my))
+
+(defn mm* [mx my]
+  (mmop * mx my))
+
+(defn mm+! [mx my]
+  (mmop! + mx my))
+
+(defn mm*! [mx my]
+  (mmop! * mx my))
+
+(defn outer-p [v1 v2]
+  (map (fn [x] (map #(* x %) v2)) v1))
+
+(defn outer-pt [v1 v2]
+  (map (fn [x] (map #(* x %) v1)) v2))
+
+;; improve adataptability to the stochastic nature of the online training behaviour
 (defn substitute
   "Substitute a vector into another"
   [v1 v2]

@@ -44,15 +44,14 @@
   "Given an Online LDA model and a topic index
   return the top-n words for that topic"
   [model topic-x top-n]
-  (let [words-of-topic (->> model :lambda
-                            ;(otils/nth' topic-x)
-                            (otils/row topic-x)
-                            (into []))
-        sorted-vals (->> (into [] words-of-topic)
-                         (sort (comp - compare))
-                         ;math/normalize
-                         (take top-n))]
-    (map #(.indexOf words-of-topic %) sorted-vals)))
+  (->> model
+       :lambda
+       (otils/row topic-x)
+       (into [])
+       (map-indexed vector)
+       (sort-by second >)
+       (take top-n)
+       (map first)))
 
 (defn describe
   "Give complete description of topic distributions

@@ -18,7 +18,8 @@
             [midje.sweet :refer [facts => truthy]]
             [criterium.core :refer [quick-bench with-progress-reporting]]
             [uncomplicate.commons.core :refer [with-release]]
-            [uncomplicate.clojurecl.core :refer [with-default finish!]]))
+            [uncomplicate.clojurecl.core :refer [with-default finish!]]
+            ))
 
 (def model {:params {:ctrl {:counter 0.0
                             :m-iters 100
@@ -123,6 +124,7 @@
                                        (untive/dv
                                         (norm-phi (-> params :ctrl :epsilon)
                                                   xlog-thetad xlog-betad)))]
+               
                (map-indexed #(uncle/axpby! (uncle/entry phinorm %1)
                                            xlog-thetad
                                            1.0
@@ -189,9 +191,9 @@
                                        (-> params :model :kappa)
                                        (-> params :ctrl :counter)))
          
-         D (-> params :model :estimated-num-docs)
+         K (-> params :model :num-topics)
          W (-> params :model :dict :num-words)
-         stats (untive/dge D W (repeat  (* D W) 0) {:layout :row})
+         stats (untive/dge K W (repeat  (* K W) 0) {:layout :row})
          
          ;; do e-step
          gs (do-e! params docs lambda stats)

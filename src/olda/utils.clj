@@ -8,7 +8,8 @@
              [real :refer [entry entry!]]
              [linalg :refer [trf tri det]]]
             [uncomplicate.commons.core :refer [with-release]]
-            [uncomplicate.clojurecl.core :as clojurecl]))
+            [uncomplicate.clojurecl.core :as clojurecl]
+            ))
 
 (defn nth'
   "The right order of params for nth"

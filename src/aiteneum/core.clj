@@ -1,6 +1,9 @@
 (ns aiteneum.core
   (:require [olda.core :as olda]
-            [eva.bag-of-words :as eva]))
+            [eva.bag-of-words :as eva]
+            [eva.vocabulary :as evv]))
+
+(reset! evv/vocab {})
 
 (def docs (read-string (slurp "resources/docs.txt")))
 
@@ -16,8 +19,8 @@
                      :tau 1.0
                      :kappa 0.5
                      :num-topics 8
-                     :estimated-num-docs 8
-                     :dict {:num-words 8228}
+                     :estimated-num-docs (count docs)
+                     :dict {:num-words (count @evv/vocab)}
                      :gamma {:shape 100
                              :scale 1e-2}}})
 

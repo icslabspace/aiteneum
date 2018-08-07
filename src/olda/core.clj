@@ -27,7 +27,7 @@
   (let [params (complement params docs (build-agnostic-dict docs))
         n (-> params :ctrl :m-iters)
         lambda (-> params :model em/sample-lambda')]
-    (em/do-ems params docs lambda n)))
+    (em/do-ems! params docs lambda n)))
 
 (defn update
   "Given a trained Online LDA model
@@ -46,8 +46,7 @@
   [model topic-x top-n]
   (let [words-of-topic (->> model :lambda
                             ;(otils/nth' topic-x)
-                            (otils/get-row' topic-x
-                             )
+                            (otils/row topic-x)
                             (into []))
         sorted-vals (->> (into [] words-of-topic)
                          (sort (comp - compare))

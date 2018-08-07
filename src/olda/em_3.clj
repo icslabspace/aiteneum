@@ -20,9 +20,6 @@
             [uncomplicate.commons.core :refer [with-release]]
             [uncomplicate.clojurecl.core :refer [with-default finish!]]))
 
-(with-default
-  (with-default-engine))
-
 (def model {:params {:ctrl {:counter 0.0
                             :m-iters 100
                             :num-iters 100
@@ -43,35 +40,27 @@
 (defn sample-gamma' [params docs]
   (let [r (count docs)
         c (:num-topics params)]
-    (untive/dge
-     ;;unopen/clge
-     r c (sample-gamma (* r c)
-                                   :shape (-> params :gamma :shape)
-                                   :scale (-> params :gamma :scale))
-     {:layout :row})))
+    (untive/dge r c (sample-gamma (* r c)
+                                  :shape (-> params :gamma :shape)
+                                  :scale (-> params :gamma :scale))
+                {:layout :row})))
 
 (defn sample-lambda' [params]
   (let [r (:num-topics params)
         c (-> params :dict :num-words)]
-    (untive/dge
-     ;;unopen/clge
-     r c (sample-gamma (* r c)
-                       :shape (-> params :gamma :shape)
-                       :scale (-> params :gamma :scale))
-     {:layout :row})))
+    (untive/dge r c (sample-gamma (* r c)
+                                  :shape (-> params :gamma :shape)
+                                  :scale (-> params :gamma :scale))
+                {:layout :row})))
 
 (defn- init-teta [params]
-  (untive/dge
-   ;;unopen/clge
-   (-> params :num-topics)
-   (-> params :dict :num-words)
-   {:layout :row}))
+  (untive/dge (-> params :num-topics)
+              (-> params :dict :num-words)
+              {:layout :row}))
 
-(defn gime-cols [m ids]
+(defn ^:obsolete gime-cols [m ids] ;; this is expensive
   ;; get all columns from m based on ids and return a neanderthal Matrix
-  (untive/dge
-   ;;unopen/clge
-   (pmap #(into [] (uncle/col m %)) ids))) ;; use into []
+  (untive/dge (pmap #(into [] (uncle/col m %)) ids)))
 
 (defn gime-v [m f ids] ;; f can only be uncle/row or uncle/col
   (map #(f m %) ids))
@@ -88,73 +77,57 @@
 
 (defn list->matrix [l]
   (let [[r c] (m/shape l)]
-    (untive/dge
-     ;;unopen/clge
-     r c l {:layout :row}
-     )))
+    (untive/dge r c l {:layout :row})))
 
 (defn list->vec [l]
-  (untive/dv l)
-  ;;(unopen/clv l)
-  )
+  (untive/dv l))
 
 (defn norm-phi [eps xlog-thetad xlog-betad]
-  ;;  (prn eps xlog-thetad xlog-betad)
+  ;;  compute a normalizing value for Phi
   (pmap #(+ eps (uncle/dot xlog-thetad %))
         xlog-betad))
 
-(defn- inside-gammad [params cts gammad xlog-thetad xlog-betadT]
+(defn- inside-gammad! [params cts gammad xlog-thetad xlog-betadT]
+  ;; ATTENTION: mutable area
   (uncle/copy!
    (fluc/fmap (fn ^double [^double x ^double y]
                 (+ (-> params :model :alpha) (* x y)))
-              xlog-thetad (untive/dv
-                           ;;unopen/clv
-                           (pmap #(uncle/dot cts %)
-                                 xlog-betadT)))
-   ;; (olda-math/m+ (-> params :model :alpha)
-   ;;               (olda-math/mm* xlog-thetad
-   ;;                              (untive/dv
-   ;;                               ;;unopen/clv
-   ;;                               (pmap #(uncle/dot cts %)
-   ;;                                     xlog-betadT))))
+              xlog-thetad (untive/dv (pmap #(uncle/dot cts %)
+                                           xlog-betadT)))
    gammad))
 
-(defn- inside-step [params ids cts gammad xlog-thetad xlog-betad xlog-betadT stats]
+(defn update-gammad! [params cts gammad xlog-thetad xlog-betadT]
+  ;; ATTENTION: mutable area
+  (let [;; keep gamma for mean
+        ;; threshold change verification
+        last-gammad (uncle/copy gammad)]
+    
+    ;; update gammad
+    (inside-gammad! params cts gammad xlog-thetad xlog-betadT)
+    (uncle/copy! (-> gammad uncle/copy dirichlet/xlogexp) xlog-thetad)
+    
+    ;; compute mean difference
+    (/ (uncle/asum (uncle/axpy -1.0 last-gammad gammad))
+       (uncle/dim last-gammad))))
 
-  ;; ways to do it:
-  ;; 1) mutual recursion between gammad-computation-fn and norm-phi: NO - recursion seems bad
-  ;; 2) some sort of in-mem state of gammad, phinorm : BETTER
-  ;;  (def m1 (unn/dge 2 3 [[1 1 1] [2 2 2]] {:layout :row}))
-  ;;  (map #(unc/axpy! (unn/dv [1 2 3]) %) (unc/rows m1))
-  ;; 2.1) we could use some neanderthal data structure which is mutable
-  ;; 2.2) we could use clojure's references
-  ;; recurence with loop/recur still seems the only true option
-  ;; but it's soo expensive
-  ;; 3) we shoud use a reduce call updating in memory gammad and phinorm; once meanthresh is reached just keep doing very inexpesive op
+(defn- inside-step! [params ids cts gammad xlog-thetad xlog-betad xlog-betadT stats]
 
   (loop [results (repeatedly (-> params :ctrl :num-iters)
-                             (fn [] (let [ ;; keep last gamma for mean threshold change verification
-                                          last-gammad (uncle/copy gammad)
-                                          
-                                          ;;update gammad
-                                          _ (inside-gammad params cts gammad xlog-thetad xlog-betadT)
-                                          _ (uncle/copy! (-> gammad uncle/copy dirichlet/xlogexp) xlog-thetad)]
-                                      
-                                      (/ (uncle/asum (uncle/axpy -1.0 last-gammad gammad))
-                                         (uncle/dim last-gammad)))))
+                             (partial update-gammad! params cts gammad xlog-thetad xlog-betadT))
          meanthresh (-> params :ctrl :mean-thresh)]
     
     (if (or (-> results seq not)
             (< (first results) meanthresh))
       ;; <=============== consuming
       (doall (let [phinorm (unmath/div cts    
-                                          (untive/dv
-                                           ;;unopen/clv
-                                           (norm-phi (-> params :ctrl :epsilon) xlog-thetad xlog-betad)))]
-                  (map-indexed #(uncle/axpby! (uncle/entry phinorm %1) xlog-thetad
-                                              1.0
-                                              (uncle/col stats %2))
-                               ids)))
+                                       (untive/dv
+                                        (norm-phi (-> params :ctrl :epsilon)
+                                                  xlog-thetad xlog-betad)))]
+               (map-indexed #(uncle/axpby! (uncle/entry phinorm %1)
+                                           xlog-thetad
+                                           1.0
+                                           (uncle/col stats %2))
+                            ids)))
       ;; update xlog-thetad
       (recur (rest results)
              (* 1e5 meanthresh)))))
@@ -165,31 +138,28 @@
 
 (defn docs->neanderthal [docs]
   (pmap #(zipmap (keys %)
-                 (pmap untive/dv
-                       ;;unopen/clv
-                       (vals %)))
+                 (pmap untive/dv (vals %)))
         docs))
 
-(defn do-e [params docs lambda stats]
+(defn do-e! [params docs lambda stats]
   (let [gamma (sample-gamma' (:model params) docs)
         xlog-theta (-> gamma uncle/copy dirichlet/xlogexp)
-        xlog-beta (-> lambda uncle/copy dirichlet/xlogexp)
-        ;; this next bit: mutable stuff!
-        _ (doall
-           (map (fn [doc gammad xlog-thetad]
-                  (inside-step params
-                                      (:word-ids doc)
-                                      (:word-counts doc)
-                                      gammad                        
-                                      xlog-thetad
-                                      (gime-cols xlog-beta (:word-ids doc))
-                                      (gime-rows xlog-beta (:word-ids doc));; 8 seconds lost in this 
-                                      ;;(time (gime-cols xlog-beta (:word-ids doc)))
-                                      stats))
-                docs
-                (uncle/rows gamma)
-                (uncle/rows xlog-theta)))
-        _ (olda-math/mm*! stats xlog-beta)]
+        xlog-beta (-> lambda uncle/copy dirichlet/xlogexp)]
+    ;; this next bit: mutable stuff!
+    (doall
+     (map (fn [doc gammad xlog-thetad]
+            (inside-step! params
+                          (:word-ids doc)
+                          (:word-counts doc)
+                          gammad                        
+                          xlog-thetad
+                          (gime-cols xlog-beta (:word-ids doc))
+                          (gime-rows xlog-beta (:word-ids doc)) ;; 8 seconds could be lost in this if we would not need to recreate nanderthal vector ds
+                          stats))
+          docs (uncle/rows gamma) (uncle/rows xlog-theta)))
+    (olda-math/mm*! stats xlog-beta)
+    
+    ;; returning stats and gamma - although this could be avoided as both stats and gamma were muted in place
     {:stats stats
      :gamma gamma}))
 
@@ -197,11 +167,10 @@
   (fast-core/pow (+ tau counter)
                  (- kappa)))
 
-(defn do-m
+(defn do-m!
   "The m step of the Online LDA algorithm"
   [params docs-count lambda gamma stats]
-  (let [
-        rho (:rho params)
+  (let [rho (:rho params)
         eta (:eta params)
         D (:estimated-num-docs params)
         b (- 1.0 rho)
@@ -211,37 +180,27 @@
 
     (uncle/axpby! 1.0 expectation b lambda)))
 
-(defn do-em
+(defn do-em!
   "The Online LDA training algorithm"
   ([params docs lambda]
    (let [;; init some model params
-         model-params (assoc (:model params)
-                             :rho (compute-rho (-> params :model :tau)
-                                               (-> params :model :kappa)
-                                               (-> params :ctrl :counter))
-                                        ;:tau (-> params :model :tau inc)
-                             )
+         params (assoc-in params [:model :rho]
+                          (compute-rho (-> params :model :tau)
+                                       (-> params :model :kappa)
+                                       (-> params :ctrl :counter)))
+         
          D (-> params :model :estimated-num-docs)
          W (-> params :model :dict :num-words)
-         stats (untive/dge
-                ;;unopen/clge
-                D W (repeat  (* D W) 0) {:layout :row})
-         
-         ;; update params
-         params (assoc params :model model-params)
+         stats (untive/dge D W (repeat  (* D W) 0) {:layout :row})
          
          ;; do e-step
-         ;;_ (prn "DBUG: starting E-step")
-         gs (do-e params docs lambda stats)
+         gs (do-e! params docs lambda stats)
 
          ;; do m-step
-         ;;_ (prn "DBUG: starting M-step")         
-         _ (do-m (:model params) (count docs) lambda
-                 (:gamma gs)
-                 (:stats gs))
-         
-         ;;_ (prn "DBUG: all done!")
-         ] 
+         ;; ATTENTION: mutable stuff
+         _ (do-m! (:model params) (count docs) lambda
+                  (:gamma gs)
+                  (:stats gs))] 
      
      ;; return updated latent vars
      {:params (update-in params [:ctrl :counter] inc)
@@ -249,9 +208,12 @@
       :stats (:stats gs)
       :lambda lambda})))
 
-(defn do-ems
+(defn do-ems!
   "This is what usually is called to train an
-  Online LDA model for a number of n iterations"
+  Online LDA model for a number of n iterations;
+
+  ATTENTION: lambda will be mutated by the end"
+
   [params docs lambda n]
   (loop [iters n
          model {:params params
@@ -260,6 +222,6 @@
     (if (zero? iters)
       model
       (recur (dec iters)
-             (do-em (:params model) docs (:lambda model))))))
+             (do-em! (:params model) docs (:lambda model))))))
     
     

@@ -8,7 +8,7 @@
 
 (def params aiteneum/params)
 
-(do (time (def res (oldam/do-ems
+(do (time (def res (oldam/do-ems!
                     params
                     (oldam/docs->neanderthal aiteneum/i-bow)
                     (oldam/sample-lambda' (:model params))

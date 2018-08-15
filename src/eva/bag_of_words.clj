@@ -1,8 +1,10 @@
 (ns eva.bag-of-words
   (:require [clojure.core.reducers :as r]
-            [clojure.string :as s]
+            [clojure.string :as st]
             [clojure.java.io :as io]
-            [eva.vocabulary :as vocab]))
+            [eva.vocabulary :as vocab]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.test.alpha :as stest]))
 
 (defn- update-bow [t-bow word]
   (let [idx (or (t-bow (keyword word)) 0)]
@@ -23,8 +25,8 @@
   "Read the content of a text file and outputs
   a vector of strings"
   [file]
-  (let [alpha-fn #(s/replace % #"[^\s\w]" "")
-        tok-fn #(s/split % #"\s+")
+  (let [alpha-fn #(st/replace % #"[^\s\w]" "")
+        tok-fn #(st/split % #"\s+")
         words-fn (fn [x] (filter #(not (= "" %)) x))]
     (-> file
         slurp
@@ -144,9 +146,9 @@
   current path. Otherwise, the given folder is used as path
   for the new file."
   ([ibow vocab-fn]
-   (ibow->file ibow
-               vocab-fn
-               (str "folder-" (.toString (java.util.UUID/randomUUID)))))
+   (indexed-bow->file ibow
+                      vocab-fn
+                      (str "folder-" (.toString (java.util.UUID/randomUUID)))))
   ([ibow vocab-fn folder]
    (-> ibow
        (ibow->doc vocab-fn)
@@ -154,3 +156,6 @@
                        java.io.File/separator
                        "file-"
                        (.toString (java.util.UUID/randomUUID)))))))
+
+
+;; specs 

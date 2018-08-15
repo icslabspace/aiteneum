@@ -110,7 +110,7 @@
            (docs->indexed-bows))
       (throw (java.io.FileNotFoundException. (str folder " not found!"))))))
 
-(defn ibow->doc
+(defn indexed-bow->doc
   "vocab-fn is the closure on vocabulary. The lambda fn has 1 arg
   which is the index of a element and returns the element at the given
   index."
@@ -151,11 +151,87 @@
                       (str "folder-" (.toString (java.util.UUID/randomUUID)))))
   ([ibow vocab-fn folder]
    (-> ibow
-       (ibow->doc vocab-fn)
+       (indexed-bow->doc vocab-fn)
        (doc->file (str folder
                        java.io.File/separator
                        "file-"
                        (.toString (java.util.UUID/randomUUID)))))))
 
 
-;; specs 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; SPECS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; regex
+(def folder-name-regex #"([.]{2}[/]{1})*[[\w[\\-]{0,1}]+/]+")
+(def file-name-regex #"([.]{2}[/]{1})*[[\w[\\-]{0,1}]+/]+[\w[\\-]{0,1}[(]*[)]*]+[[.]{1}txt]{0,1}")
+
+(s/def ::filename (s/and string?
+                         #(re-matches file-name-regex %)))
+(s/def ::folder (s/and string?
+                       #(re-matches folder-name-regex %)))
+
+(s/def ::doc (s/coll-of string?))
+(s/def ::docs (s/coll-of ::doc))
+
+(s/def ::word-ids (s/coll-of int?))
+(s/def ::word-counts (s/coll-of int?))
+(s/def ::bow (s/coll-of (s/tuple string? int?)))
+(s/def ::ibow (s/keys :req-un [::word-ids ::word-counts]))
+(s/def ::ibows (s/coll-of ::ibow))
+(s/def ::vocab-fn ifn?) ;; (s/fspec :args (s/cat :idx int?) :ret string?)
+
+;; functions working on collection of strings 
+(s/fdef doc->bow
+  :args (s/cat :doc ::doc)
+  :ret ::bow)
+
+(s/fdef doc->indexed-bow
+  :args (s/cat :doc ::doc)
+  :ret ::ibow)
+
+(s/fdef docs->indexed-bows
+  :args (s/cat :docs ::docs)
+  :ret ::ibows)
+
+(s/fdef indexed-bow->doc 
+  :args (s/cat :doc ::ibow
+               :vocab-fn ::vocab-fn)
+  :ret ::doc)
+
+;; functions working on files
+(s/fdef file->doc
+  :args (s/alt :file ::filename
+               :file #(instance? java.io.File %)) 
+  :ret ::doc)
+
+(s/fdef file->indexed-bow
+  :args (s/cat :file ::filename)
+  :ret ::ibow)
+
+(s/fdef files->indexed-bows
+  :args (s/cat :folder ::folder)
+  :ret ::ibows)
+
+(s/fdef doc->file
+  :args (s/cat :doc ::doc
+               :filename ::filename)
+  :ret coll?)
+
+(s/fdef indexed-bow->file
+  :args (s/cat :ibow ::ibow
+               :vocab-fn ::vocab-fn
+               :folder (s/* ::folder))
+  :ret coll?)
+
+;; instrumentation
+(stest/instrument [`doc->bow
+                   `doc->indexed-bow
+                   `docs->indexed-bows
+                   `indexed-bow->doc
+                   `file->doc
+                   `file->indexed-bow
+                   `files->indexed-bow
+                   `doc->file
+                   `indexed-bow->files])
+
+
+

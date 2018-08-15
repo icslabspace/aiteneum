@@ -107,3 +107,50 @@
            (pmap file->doc)
            (docs->indexed-bows))
       (throw (java.io.FileNotFoundException. (str folder " not found!"))))))
+
+(defn ibow->doc
+  "vocab-fn is the closure on vocabulary. The lambda fn has 1 arg
+  which is the index of a element and returns the element at the given
+  index."
+  [ibow vocab-fn]
+  (loop [result (transient [])
+         words (:word-ids ibow)
+         counts (:word-counts ibow)]
+    (if (nil? (first words))
+      (->> result persistent! flatten vec (map vocab-fn))
+      (recur (conj! result (repeat (first counts) (first words)))
+             (rest words)
+             (rest counts)))))
+
+(defn doc->file
+  "Writes the doc (collection of strings) in the
+  file with the given filename. Creates parent directories
+  if needed in the path."
+  ([doc filename]
+   (clojure.java.io/make-parents filename)
+   (spit filename "" :append false) 
+   (doall (pmap #(spit filename (str % " ") :append true) doc))))
+
+(defn indexed-bow->file
+  "Converts an indexed bag of words into a collection of
+  strings which is later written in a file. For the index to
+  word convertion, the vocab-fn is needed.
+  i.e.
+  * if vocab is a list => vocab-fn is (partial nth vocab)
+  * if vocab is a map => vocab-fn is (partial contains? vocab)
+  * if vocab is eva.vocab => vocab-fn is (partial eva.vocabulary/get-word)
+
+  If no folder is provided, a new folder is generated in the
+  current path. Otherwise, the given folder is used as path
+  for the new file."
+  ([ibow vocab-fn]
+   (ibow->file ibow
+               vocab-fn
+               (str "folder-" (.toString (java.util.UUID/randomUUID)))))
+  ([ibow vocab-fn folder]
+   (-> ibow
+       (ibow->doc vocab-fn)
+       (doc->file (str folder
+                       java.io.File/separator
+                       "file-"
+                       (.toString (java.util.UUID/randomUUID)))))))

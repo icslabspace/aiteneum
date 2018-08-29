@@ -38,7 +38,7 @@
   "Given an Online LDA model and a document index
   return topic distributions for that document"
   [model doc-x]
-  (-> model :gamma (m/get-row doc-x) math/normalize))
+  (->> model :gamma (otils/row doc-x) math/normalize))
 
 (defn take-words
   "Given an Online LDA model and a topic index

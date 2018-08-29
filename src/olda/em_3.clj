@@ -38,20 +38,29 @@
             :lambda nil
             :gamma nil})
 
+(defmacro sample-gammal [dim shape scale]
+  `(if (> ~dim 1)
+     (sample-gamma ~dim
+                   :shape ~shape
+                   :scale ~scale)
+     [(sample-gamma ~dim
+                    :shape ~shape
+                    :scale ~scale)]))
+
 (defn sample-gamma' [params docs]
   (let [r (count docs)
         c (:num-topics params)]
-    (untive/dge r c (sample-gamma (* r c)
-                                  :shape (-> params :gamma :shape)
-                                  :scale (-> params :gamma :scale))
+    (untive/dge r c (sample-gammal (* r c)
+                                   (-> params :gamma :shape)
+                                   (-> params :gamma :scale))
                 {:layout :row})))
 
 (defn sample-lambda' [params]
   (let [r (:num-topics params)
         c (-> params :dict :num-words)]
-    (untive/dge r c (sample-gamma (* r c)
-                                  :shape (-> params :gamma :shape)
-                                  :scale (-> params :gamma :scale))
+    (untive/dge r c (sample-gammal (* r c)
+                                   (-> params :gamma :shape)
+                                   (-> params :gamma :scale))
                 {:layout :row})))
 
 (defn- init-teta [params]

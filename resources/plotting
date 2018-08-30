@@ -5,6 +5,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from matplotlib import cm
 from scipy.interpolate import spline
 import json
+import os
 
 def plot3d_matrix(m,name):
     x_len=len(m)
@@ -30,5 +31,15 @@ with open('cc','r') as f:
     m_coll=json.load(f)
 
 plot3d_all(m_coll)
-    
 
+#plot3d_matrix([[1,8,1,0,0,0],[0,0,2,7,1,0],[8,1,1,0,0,0],[0,0,0,0,3,7],[0,1,9,0,0,0],[0,0,0,1,8,1]],'00.png')
+
+# given a folder containing json files with 1 matrix each, plot it using
+# the original filename (just to know where the data came from)
+def plot_mat(folder):
+    for file in os.listdir(folder):
+    	with open(os.path.join(folder,file),'r') as f:
+	     plot3d_matrix(json.load(f),file+'.png')
+
+
+#plot_mat('cc')

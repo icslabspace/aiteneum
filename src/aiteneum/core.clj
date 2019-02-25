@@ -27,7 +27,7 @@
 ;(def olda-model (olda/train params i-bow))
 
 ;;(def i-bow (eva.bag-of-words/files->indexed-bows "resources/basic-corpus/"))
-(def i-bow (olda.em-3/docs->neanderthal (eva.bag-of-words/files->indexed-bows "../cambioscience/yhi/resources/data/optu/")))
+(def i-bow (olda.em-3/docs->neanderthal (eva.bag-of-words/files->indexed-bows "../-/-/resources/data/optu/")))
 
 (def params {:ctrl {:counter 0.0
                     :m-iters 100

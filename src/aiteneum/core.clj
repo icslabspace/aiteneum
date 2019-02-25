@@ -23,4 +23,4 @@
 
 ;(def olda-model (olda/train params i-bow))
 
-;(def i-bow (eva.bag-of-words/files->indexed-bows "../cambioscience-all/selena/resources/data/single-doc/"))
+;(def i-bow (eva.bag-of-words/files->indexed-bows "../--all/-/resources/data/single-doc/"))

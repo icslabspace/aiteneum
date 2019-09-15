@@ -1,8 +1,9 @@
 (ns olda.core
   (:require [incanter.stats :refer [sample-gamma]]
             [clojure.core.reducers :as r]
-            [olda.em :as em]
-            [olda.math :as math]
+            [clojure.core.matrix :as m]
+            [olda.em-3 :as em]
+            [olda.math-3 :as math]
             [olda.utils :as otils]))
 
 (defn- complement
@@ -26,7 +27,7 @@
   (let [params (complement params docs (build-agnostic-dict docs))
         n (-> params :ctrl :m-iters)
         lambda (-> params :model em/sample-lambda')]
-    (em/do-ems params docs lambda n)))
+    (em/do-ems! params docs lambda n)))
 
 (defn update
   "Given a trained Online LDA model
@@ -37,17 +38,20 @@
   "Given an Online LDA model and a document index
   return topic distributions for that document"
   [model doc-x]
-  (-> model :gamma (nth doc-x) math/normalize))
+  (->> model :gamma (otils/row doc-x) math/normalize))
 
 (defn take-words
   "Given an Online LDA model and a topic index
   return the top-n words for that topic"
   [model topic-x top-n]
-  (let [words-of-topic (->> model :lambda (otils/nth' topic-x))
-        sorted-vals (->> words-of-topic
-                         (sort (comp - compare)) ; math/normalize
-                         (take top-n))]
-    (map #(.indexOf words-of-topic %) sorted-vals)))
+  (->> model
+       :lambda
+       (otils/row topic-x)
+       (into [])
+       (map-indexed vector)
+       (sort-by second >)
+       (take top-n)
+       (map first)))
 
 (defn describe
   "Give complete description of topic distributions

@@ -44,6 +44,4 @@
                      :gamma {:shape 100
                              :scale 1e-2}}})
 
-
 ;(def i-bow (eva.bag-of-words/files->indexed-bows "resources/"))
-

@@ -1,6 +1,6 @@
 (ns recommender.movies
   {:author "Alex Gherega" :doc "basic API for predicting movie recommendations"}
-    
+  
   (:require [clojure.data.csv :as csv]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.linear :as lin]
@@ -10,7 +10,9 @@
             [recommender.models.cofi :as mc]
             [recommender.data.movie-lens :as movie-lens]
             [recommender.data.serializer :as ser]
-            [recommender.particles :as parts]))
+            [recommender.particles :as parts]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.test.alpha :as stest]))
 
 (m/set-current-implementation :vectorz)
 ;; ---------------------------
@@ -41,3 +43,16 @@
     
     (mapv #(->> % first (nth movies-list) second)
           (take n (sort-by second distances)))))
+
+
+;; --------------------------------------
+;; specs
+
+;;TODO:
+;; (s/fdef predict-by-ratings
+;;   :args (s/cat :movies-model))
+
+
+
+;; (stest/instrument [`predict-by-ratings
+;;                    `predict-by-cossim])

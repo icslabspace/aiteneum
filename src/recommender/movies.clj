@@ -1,4 +1,6 @@
 (ns recommender.movies
+  {:author "Alex Gherega" :doc "basic API for predicting movie recommendations"}
+    
   (:require [clojure.data.csv :as csv]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.linear :as lin]

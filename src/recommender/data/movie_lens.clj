@@ -1,4 +1,6 @@
 (ns recommender.data.movie-lens
+  {:author "Alex Gherega" :doc "From movie lens to Clojure data structures"}
+  
   (:require [clojure.data.csv :as csv]
             [clojure.core.matrix :as m]
             [clojure.java.io :as io]

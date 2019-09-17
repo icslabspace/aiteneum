@@ -1,4 +1,6 @@
 (ns recommender.data.serializer
+  {:author "Alex Gherega" :doc "Basic serialization operations"}
+  
   (:require [clojure.core.matrix :as m]
             [clojure.java.io :as io]
             [clojure.edn :as edn]))

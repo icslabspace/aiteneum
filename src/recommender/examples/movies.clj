@@ -1,4 +1,6 @@
 (ns recommender.examples.movies
+  {:author "Alex Gherega" :doc "Putting everything together on how to get movie recommendations starting from the MovieLens dataset"}
+    
   (:require [clojure.data.csv :as csv]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.linear :as lin]

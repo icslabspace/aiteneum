@@ -1,4 +1,6 @@
 (ns recommender.models.cofi
+  {:author "Alex Gherega" :doc "Collaborative filtering recommender model"}
+  
   (:require [clojure.core.matrix :as m]
             [fastmath.core :as fmc]
             [fastmath.stats :as fms]))

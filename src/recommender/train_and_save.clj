@@ -1,4 +1,6 @@
 (ns recommender.train-and-save
+  {:author "Alex Gherega" :doc "Build pre-trained models for movie recommendations and store them on disk"}
+  
   (:require [clojure.core.matrix :as m]
             [recommender.data.movie-lens :as movie-lens]
             [recommender.particles :as parts]

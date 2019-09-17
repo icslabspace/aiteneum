@@ -1,8 +1,11 @@
 (ns recommender.particles
+  {:author "Alex Gherega" :doc "Some vector space utilities"}
+  
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.linear :as lin]
             [fastmath.stats :as fms]))
 
+;; TODO: move this to vspace/particles.clj
 (defn random-matrix [n m]
   (m/matrix 
    (repeatedly n

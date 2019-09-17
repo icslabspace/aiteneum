@@ -63,7 +63,7 @@
 ;; (def num-users (-> y m/shape second))
 ;; (def num-movies (-> y m/shape first))
 
-(def model-file "resources/recommender/comedy-model-[lambda=1.5][alpha=0.001][no-iters=100].edn")
+  (def model-file "resources/recommender/comedy-model-[lambda=1.5][alpha=0.001][no-iters=300].edn")
 
 (defn pprint-recommend-movies [search-str]
   (let [comedies-list (mov-l/get-movies mov-l/movies-csv :comedy)

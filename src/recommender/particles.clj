@@ -34,6 +34,9 @@
 
 ;; ----------------------------------
 ;; specs
+(s/def ::num-vector
+  (s/and m/vec?
+         #(every? number? %)))
 
 (s/fdef random-matrix
   :args (s/cat :n pos-int? :m pos-int?)
@@ -64,7 +67,8 @@
 
 
 (s/fdef cos-sim
-  :args (s/cat :v1 (s/coll-of number?) :v2 (s/coll-of :number))
+  :args (s/cat :v1 ::num-vector
+               :v2 ::num-vector)
   :ret (s/and #(<= % 1.0) #(>= % -1.0)))
 
 (stest/instrument [`random-matrix

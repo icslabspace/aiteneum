@@ -9,6 +9,23 @@
 
 (m/set-current-implementation :vectorz)
 
+(comment "in this model think of the x y r and theta matrices as follows:
+E - entities of type for which one wishes a recommendation (e.g. movies); we refer to an entitye of this type as e 
+U - entities that gave a ranking/score for elements in E (e.g. users); we refer to an entity of this type as u
+
+x <- [(count E) x number of features] - a row in x is a feature vector for e
+y <- [(count E) X (count U)] - a row in y is a scoring given by all u in U to an e
+r <- same shape as y; whenever y(i,j) is 0 r(i,j) is 0.0; else r(i,j) is 1.0 
+theta <- [(count U) x number of features] - a row in theta is features' weights vector for u
+
+e.g.
+x=[movies X features] where features could be genres; features are learned to depict a movie
+y=[movies X users] to each movie a user gave a score [1..5] or 0 if no score
+r=syntactic sugar for y with 1s and 0s
+theta=[users X features] for each user a set of weights are learned to describe user preferences;
+x * thetaT gives our predictions (a row will state users' preferences for a movie); or one could use x as a vector space an lookup similar movies by some distance metric")
+
+
 ;; cost function
 (defn linear-cost [x y r theta]
   (let [sparse (m/mul (m/sub (m/mmul x (m/transpose theta)) y)

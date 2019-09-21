@@ -15,16 +15,16 @@ To get this trained model one needs to call `gd-train` function with 4 matrices 
 
 * 5th arg: is a map containing 3 functions: `{:keys [rcost-f rgx-f rgtheta-f] :as r-fns}` ; all functions receive the same input: `[x y r theta lambda]`
 
-  * rcost-f is a function returning a single number 
-  * rgx-f is a function returning a matrix with gradients for x (so same shape as x)
-  * rgtheta-f is a function returning a matrix with gradients for theta (so same shape as theta)
+  * `rcost-f` is a function returning a single number 
+  * `rgx-f` is a function returning a matrix with gradients for x (so same shape as x)
+  * `rgtheta-f` is a function returning a matrix with gradients for theta (so same shape as theta)
 
-* 6th arg: is a map containing parameters: {:keys [lambda alpha epsilon no-iters] :as params} where:
+* 6th arg: is a map containing parameters: `{:keys [lambda alpha epsilon no-iters] :as params}` where:
 
-  * lambda is the regularization rate
-  * alpha is the gradient descent update/learning rate
-  * epsilon is a threshold for stoping the training (before the no-iters is consumed)
-  * no-iters is the maximum number of iterations that training is allowed to run
+  * `lambda` is the regularization rate
+  * `alpha` is the gradient descent update/learning rate
+  * `epsilon` is a threshold for stoping the training (before the no-iters is consumed)
+  * `no-iters` is the maximum number of iterations that training is allowed to run
 
 ```Clojure
 (let [x [[1 2] [3 4] [5 6]]

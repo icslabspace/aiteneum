@@ -36,10 +36,10 @@ To get this trained model one needs to call `gd-train` function with 4 matrices 
     				      {:rcost-f recommender.models.cofi/regularized-linear-cost
                                        :rgx-f recommender.models.cofi/regularized-gradx 
                                        :rgtheta-f recommender.models.cofi/regularized-gradtheta}
-                                       {:lambda 1.5 :alpha 0.001 :epsilon 0.01 :no-iters 10}))```
+                                       {:lambda 1.5 :alpha 0.001 :epsilon 0.01 :no-iters 10}))				       
+```	
 
 This will output:
-
 
 ```Clojure
 "Iteration no: " 10 0.14 1
@@ -60,7 +60,8 @@ This will output:
   [2.9552414278201855 3.9400620688520833]
   [4.925504230306068 5.910605076367282]]
   ;; trained final theta (weights) matrix
- [[0.16693054182631142 0.92589889709618]]]```
+ [[0.16693054182631142 0.92589889709618]]]
+ ```
 
 
 ## [MovieLens](https://grouplens.org/datasets/movielens/) datasets

@@ -13,33 +13,35 @@ To get this trained model one needs to call `gd-train` function with 4 matrices 
 * 3rd arg: r is a MxN binary matrix (it matches all zeros in y and puts 1.0s (or 1s) where it doesnt)
 * 4th arg: theta is a NxK matrix
 
-* 5th arg: is a map containing 3 functions: {:keys [rcost-f rgx-f rgtheta-f] :as r-fns} ; all functions receive the same input: `[x y r theta lambda]`
+* 5th arg: is a map containing 3 functions: `{:keys [rcost-f rgx-f rgtheta-f] :as r-fns}` ; all functions receive the same input: `[x y r theta lambda]`
 
-** rcost-f is a function returning a single number 
-** rgx-f is a function returning a matrix with gradients for x (so same shape as x)
-** rgtheta-f is a function returning a matrix with gradients for theta (so same shape as theta)
+  * rcost-f is a function returning a single number 
+  * rgx-f is a function returning a matrix with gradients for x (so same shape as x)
+  * rgtheta-f is a function returning a matrix with gradients for theta (so same shape as theta)
 
 * 6th arg: is a map containing parameters: {:keys [lambda alpha epsilon no-iters] :as params} where:
 
-** lambda is the regularization rate
-** alpha is the gradient descent update/learning rate
-** epsilon is a threshold for stoping the training (before the no-iters is consumed)
-** no-iters is the maximum number of iterations that training is allowed to run
+  * lambda is the regularization rate
+  * alpha is the gradient descent update/learning rate
+  * epsilon is a threshold for stoping the training (before the no-iters is consumed)
+  * no-iters is the maximum number of iterations that training is allowed to run
 
-```(let [x [[1 2] [3 4] [5 6]]
-            y [[5] [4] [0]]
-            r [[1] [1] [0]]
-            theta [[0.14 0.88]]]
-        (recommender.models.cofi/gd-train x y r theta
-                                          {:rcost-f recommender.models.cofi/regularized-linear-cost
-                                           :rgx-f recommender.models.cofi/regularized-gradx
-                                           :rgtheta-f recommender.models.cofi/regularized-gradtheta}
-                                          {:lambda 1.5 :alpha 0.001 :epsilon 0.01 :no-iters 10}))```
+```Clojure
+(let [x [[1 2] [3 4] [5 6]]
+      y [[5] [4] [0]]
+      r [[1] [1] [0]]
+      theta [[0.14 0.88]]]
+
+    (recommender.models.cofi/gd-train x y r theta
+    				      {:rcost-f recommender.models.cofi/regularized-linear-cost
+                                       :rgx-f recommender.models.cofi/regularized-gradx 
+                                       :rgtheta-f recommender.models.cofi/regularized-gradtheta}
+                                       {:lambda 1.5 :alpha 0.001 :epsilon 0.01 :no-iters 10}))```
 
 This will output:
 
 
-```
+```Clojure
 "Iteration no: " 10 0.14 1
 "Iteration no: " 9 0.14307 0.998934
 "Iteration no: " 8 0.14604767456065174 0.9978772680027608
@@ -69,7 +71,7 @@ The actual [MovieLens](https://grouplens.org/datasets/movielens/) csv files are 
 
 To read the movies csv into a useful Clojure movies data structure (movie-list - altough it's a seq not necessarily a list :):
 
-```recommender.data.movie-lens/get-movies`
+`recommender.data.movie-lens/get-movies`
 
 ## Train and save
 
@@ -78,9 +80,10 @@ Usual practical examples mean that matrices x, y and theta are large so training
 For that reason we can train a model a save it to a file for later use.
 To do so one could use the `recommender.train-and-save` namespace.
 
-For example, to save a model 
+For example, to save a model tra
 
-```(defn comedies-model
+```Clojure
+(defn comedies-model
   "Train a Collaborative Filtering model (for no-iters iterations) for all comedies in a MovieLens data set and serialize it to disk"
   [no-iters]
   (movies-model movie-lens/movies-csv movie-lens/ratings-csv

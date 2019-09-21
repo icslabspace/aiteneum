@@ -13,6 +13,7 @@
          criterium                              {:mvn/version "0.4.5"}
          incanter                               {:mvn/version "1.9.3"
                                                  :exclusions [com.lowagie/itext]}
+         org.clojure/data.csv                   {:mvn/version "0.1.4"}
          ;; edu.stanford.nlp/stanford-corenlp      {:mvn/version "3.9.2"}
          ;; edu.stanford.nlp/stanford-corenlp$models {:mvn/version "3.9.2"}
          ;; edu.stanford.nlp/stanford-corenlp$models-english {:mvn/version "3.9.2"}

@@ -103,14 +103,14 @@ where the first argument is a string filepath to a MovieLens movies.csv file and
  :action
  :crime]
  ```
-To read the ratings csv into a useful Clojure ratings data structure (i.e. a collection of tuples `[[userId movieId] rating]`:
+To read the ratings csv into a useful Clojure ratings data structure (i.e. a collection of tuples `[[userId movieId] rating]`):
 
 ```Clojure
 (recommender.data.movie-lens/get-ratings "resources/recommender/movie-lens/ml-latest-small/ratings.csv" movies)
 ```
 This namespace provides you with the `create-ymatrix` and `create-rmatrix` functions which will output a `y` matrix of `[number-of-movies X number-of-users]` and an `r` matrix of the same shape as `y` but with zeros wherever `y` is zero and with ones wherever `y` is not zero.
 
-The `(clojure.core.matrix/get-element y i j)` will give you the rating for movieId i given by userId j.
+The `(clojure.core.matrix/get-element y i j)` will give you the rating for *movieId* `i` given by *userId* `j`.
 
 ## Train and save
 
@@ -193,7 +193,7 @@ For example:
      (clojure.core.matrix/sparse-matrix
 	(recommender.data.movie-lense/create-rmatrix initial-y)))
 ```
-*NOTE*: always use sparse-matrix as inputs to `recommender.train-and-save/train-model` or equivalent functions.
+**NOTE**: always use sparse-matrix as inputs to `recommender.train-and-save/train-model` or equivalent functions.
 
 Suppose I have my (or a new user has its) own rating 5 star for the "Soul Kitchen" movie. Then one should update the `y` matrix so that is now looks like this:
 
@@ -202,7 +202,7 @@ Suppose I have my (or a new user has its) own rating 5 star for the "Soul Kitche
  [0.0 5.0 5.0 4.5 0.0 0.0]
  [0.0 0.0 0.0 0.0 5.0 5.0]]
  ```
-Similarly the `r` matrix should be updated (just call the `create-rmatrix` on the new `y`). (you should just call `create-rmatrix` once you have your final `y`).
+Similarly the `r` matrix should be updated (just call the `create-rmatrix` on the new `y`). You should try and just call `create-rmatrix` once you have your final `y`.
 
 You can now call `recommender.movies/predict-by-ratings` with a CoFi model trained on `y` and `r` and specify the last argument as the number of recommendetions you'd like to get. This function multiplies `x` by `theta` and the first column gives you the predictions.
 
@@ -220,7 +220,7 @@ which is stored in the `resources/recommender/` directory.
 
 If you want to get the first 30 similar movies based on a search string this is a code you could use:
 
-```
+```Clojure
 (defn pprint-recommend-movies [search-str]
   (let [;; get the clojure comedies collection 
         comedies-list (mov-l/get-movies mov-l/movies-csv :comedy) ;; this is a collection of tuples [movieId title genre-mix]

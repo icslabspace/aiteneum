@@ -213,12 +213,12 @@
   :ret number?)
 
 (s/fdef get-movies
-  :args (s/cat :movies-csv ::csv-data
+  :args (s/cat :movies-csv string? ;;::csv-data
                :genre ::genre)
   :ret ::movies-list)
 
 (s/fdef get-ratings
-  :args (s/cat :ratings-csv ::csv-data
+  :args (s/cat :ratings-csv string? ;;::csv-data
                :movies ::movies-list)
   :ret ::ratings)
 

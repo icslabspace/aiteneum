@@ -104,8 +104,8 @@
                :params map?))
 
 (s/fdef movies-model
-  :args (s/cat :movies-csv :recommender.data.movie-lens/csv-data
-               :ratings-csv :recommender.data.movie-lens/csv-data
+  :args (s/cat :movies-csv string? ;;:recommender.data.movie-lens/csv-data
+               :ratings-csv string? ;;:recommender.data.movie-lens/csv-data
                :ynorm-fn ifn?
                :ymean-fn ifn?
                :params :recommender.models.cofi/params))

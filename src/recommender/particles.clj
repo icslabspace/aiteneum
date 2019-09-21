@@ -38,6 +38,17 @@
   (s/and m/vec?
          #(every? number? %)))
 
+(s/def ::binary-iter #(every? #{1.0 0.0 1 0} %))
+
+(s/def ::binary-vector
+  (s/and m/vec?
+         #(every? #{1.0 0.0 1 0} %)))
+
+(s/def ::binary-matrix
+  (s/and m/matrix?
+         #(every? (fn [row] (s/valid? ::binary-vector row)) %)))
+
+
 (s/fdef random-matrix
   :args (s/cat :n pos-int? :m pos-int?)
   
@@ -71,7 +82,7 @@
                :v2 ::num-vector)
   :ret (s/and #(<= % 1.0) #(>= % -1.0)))
 
-(stest/instrument [`random-matrix
-                   `compute-ymean
-                   `compute-ynorm
-                   `cos-sim])
+;; (stest/instrument [`random-matrix
+;;                    `compute-ymean
+;;                    `compute-ynorm
+;;                    `cos-sim])

@@ -70,7 +70,7 @@
         comedies-model (ser/baby-slurp model-file)
 
 
-        movies (recommender.data.movie-lens/title->movie comedies-list search-str)
+        movies (recommender.data.movie-lens/title->movies comedies-list search-str)
         movie-ids (mapv first movies)]
     
     (clojure.pprint/pprint movies)

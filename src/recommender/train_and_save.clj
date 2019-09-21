@@ -5,11 +5,13 @@
             [recommender.data.movie-lens :as movie-lens]
             [recommender.particles :as parts]
             [recommender.models.cofi :as mc]
-            [recommender.data.serializer :as ser]))
+            [recommender.data.serializer :as ser]
+            [clojure.spec.alpha :as s]))
 
 (def params {:lambda 1.5 :alpha 0.001 :epsilon 0.01 :no-iters 50})
 
 (defn train-model
+  "Closure over mc/gd-train. Prepares all necessary inputs to run gradient descent"
   ([x [ynorm ymean :as y] r theta r-fns params]
    (let [_ (prn "the shape of theta: " (m/shape theta))
          
@@ -31,7 +33,9 @@
      
      (train-model x y r theta r-fns params))))
 
-(defn- directed-spit [model model-type params]
+(defn- directed-spit
+  "File name formatter and saver."
+  [model model-type params]
   (let [path (str "resources/recommender/" (name model-type) "-model-")
         path (reduce #(str %1 "[" (-> %2 key name) "=" (val %2) "]") path
                      params)]
@@ -39,6 +43,7 @@
                    (str path ".edn"))))
 
 (defn movies-model
+  "Build a movies models based on certain parasm (e.g. for all comedy movies)"
   ([movies-csv ratings-csv ynorm-fn ymean-fn params]
    (let [genre (:genre params)
          movies-list (movie-lens/get-movies movies-csv genre)
@@ -51,10 +56,60 @@
 
      (directed-spit movies-model genre (dissoc params :epsilon :genre)))))
 
-(defn comedies-model [no-iters]
+(defn comedies-model
+  "Train a Collaborative Filtering model (for no-iters iterations) for all comedies in a MovieLens data set and serialize it to disk"
+  [no-iters]
   (movies-model movie-lens/movies-csv movie-lens/ratings-csv
 
                 parts/compute-ynorm
                 (fn [_] 0.0) ;; parts/compute-ymean 
 
                 (assoc params :genre :comedy :no-iters no-iters)))
+
+
+;; ----------------------------------------
+;; specs
+
+(s/def ::ymean :recommender.data.serializer/ymean)
+
+(s/def ::ynorm-ymean (s/tuple m/matrix? ::ymean))
+
+(s/def ::model :recommender.data.serializer/model)
+
+(s/fdef train-model
+  :args (s/or :f1 (s/and (s/cat :x m/matrix?
+                                :y ::ynorm-ymean
+                                :r :recommender.particles/binary-matrix
+                                :theta m/matrix?
+                                :r-fns :recommender.models.cofi/r-fns
+                                :params :recommender.models.cofi/params)
+                         
+                         #(m/same-shape? (-> % :y first) (:r %))
+                         
+                         #(= (-> % :x m/shape) [(-> % :y first m/shape first)
+                                                (-> % :theta m/shape second)])
+                         
+                         #(= (-> % :theta m/shape) [(-> % :y first m/shape second)
+                                                    (-> % :x m/shape second)]))
+              :f2 (s/and (s/cat :movies-list :recommender.data.movie-lens/csv-data
+                                :ratings :recommender.data.movie-lens/ratings
+                                :y ::ynorm-ymean
+                                :r :recommender.models.cofi/binary-matrix
+                                :params :recommender.models.cofi/params)))
+  :ret ::model)
+
+(s/fdef directed-spit
+  :args (s/cat :model ::model
+               :model-type string?
+               :params map?))
+
+(s/fdef movies-model
+  :args (s/cat :movies-csv :recommender.data.movie-lens/csv-data
+               :ratings-csv :recommender.data.movie-lens/csv-data
+               :ynorm-fn ifn?
+               :ymean-fn ifn?
+               :params :recommender.models.cofi/params))
+
+(s/fdef comedies-model
+  :args (s/cat :no-iters pos-int?))
+
